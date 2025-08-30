@@ -13,6 +13,12 @@ import axios from "axios";
 import ToastContainer from "./ToastContainer";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../hooks/useToast";
+import app from "../lib/firebase";
+import {
+  getAuth,
+  RecaptchaVerifier,
+  signInWithPhoneNumber,
+} from "firebase/auth";
 
 const STEPS = {
   PHONE: "phone",
@@ -26,30 +32,53 @@ function PhoneLoginModal({ isOpen, onClose }) {
   const [countryCode, setCountryCode] = useState("+91");
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [userDetails, setUserDetails] = useState({ name: "", email: "" });
+  const [confirmationResult, setConfirmationResult] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const { toasts, toast, removeToast } = useToast();
   const navigate = useNavigate();
+  const auth = getAuth(app);
+
+  const setupRecaptcha = () => {
+    if (!window.recaptchaVerifier) {
+      window.recaptchaVerifier = new RecaptchaVerifier(
+        auth,
+        "recaptcha-container",
+        {
+          size: "invisible",
+          callback: () => console.log("reCAPTCHA solved"),
+        }
+      );
+
+      window.recaptchaVerifier.render().then((widgetId) => {
+        window.recaptchaWidgetId = widgetId;
+      });
+    }
+  };
 
   const handlePhoneSubmit = async (e) => {
     e.preventDefault();
-    setIsLoading(true);
+    if (!phoneNumber) return toast.error("Enter phone number");
 
+    setIsLoading(true);
     try {
-      const { data } = await axios.post(
-        `${import.meta.env.VITE_SERVER_API}/generate-otp`,
-        { phoneNumber },
-        { withCredentials: true }
+      setupRecaptcha();
+      const appVerifier = window.recaptchaVerifier;
+
+      const result = await signInWithPhoneNumber(
+        auth,
+        `${countryCode}${phoneNumber}`,
+        appVerifier
       );
 
-      if (data.success === true) {
-        toast.success(data.message);
-        setCurrentStep(STEPS.OTP);
-      } else {
-        toast.error("Something went wrong! Please try again");
-      }
+      setConfirmationResult(result);
+      toast.success("OTP sent successfully!");
+      setCurrentStep(STEPS.OTP);
     } catch (error) {
-      console.log(error.message);
-      toast.error("Something went wrong! Please try again");
+      console.error(error);
+      toast.error("Failed to send OTP");
+      if (window.recaptchaWidgetId !== undefined) {
+        grecaptcha.reset(window.recaptchaWidgetId);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -71,31 +100,34 @@ function PhoneLoginModal({ isOpen, onClose }) {
 
   const handleOtpSubmit = async (e) => {
     e.preventDefault();
-    setIsLoading(true);
+    if (otp.join("").length < 6) return toast.error("Enter full OTP");
 
+    setIsLoading(true);
     try {
+      const result = await confirmationResult.confirm(otp.join(""));
+      const user = result.user;
+
       const { data } = await axios.post(
-        `${import.meta.env.VITE_SERVER_API}/verify-otp`,
-        { phoneNumber, otp: otp.toString() },
+        `${import.meta.env.VITE_SERVER_API}/check-user`,
+        { phoneNumber: user.phoneNumber, uid: auth.currentUser.uid },
         { withCredentials: true }
       );
 
       if (data.success === true) {
         if (data.existing === true) {
           localStorage.setItem("token", data.token);
-          toast.success("Welcome back!");
-          onClose();
+          toast.success("Phone Verified");
           navigate("/");
+          onClose();
         } else {
-          toast.success("Phone verified successfully");
           setCurrentStep(STEPS.DETAILS);
         }
       } else {
         toast.error(data.message);
       }
     } catch (error) {
-      console.log(error.message);
-      toast.error("Something went wrong! Please try again");
+      console.error(error);
+      toast.error("Invalid OTP");
     } finally {
       setIsLoading(false);
     }
@@ -103,6 +135,8 @@ function PhoneLoginModal({ isOpen, onClose }) {
 
   const handleDetailsSubmit = async (e) => {
     e.preventDefault();
+    if (!userDetails.name || !userDetails.email)
+      return toast.error("Fill all details");
     setIsLoading(true);
 
     try {
@@ -122,7 +156,7 @@ function PhoneLoginModal({ isOpen, onClose }) {
       }
     } catch (error) {
       console.log(error.message);
-      toast.error("Something went wrong! Please try again");
+      toast.error("Failed to save details");
     } finally {
       setIsLoading(false);
     }
@@ -178,7 +212,6 @@ function PhoneLoginModal({ isOpen, onClose }) {
             required
           />
         </div>
-
         <button
           type="submit"
           disabled={isLoading || !phoneNumber}
@@ -223,7 +256,7 @@ function PhoneLoginModal({ isOpen, onClose }) {
         <div className="flex justify-center space-x-4">
           {otp.map((digit, index) => (
             <input
-              key={index}
+              key={`otp-${index}`}
               id={`otp-${index}`}
               type="text"
               value={digit}
@@ -366,7 +399,7 @@ function PhoneLoginModal({ isOpen, onClose }) {
               <div className="flex space-x-2">
                 {Object.values(STEPS).map((step, index) => (
                   <div
-                    key={step}
+                    key={`step-${step}-${index}`}
                     className={`w-3 h-3 rounded-full transition-colors ${
                       Object.values(STEPS).indexOf(currentStep) >= index
                         ? "bg-primary-500"

@@ -198,7 +198,6 @@ function Login() {
         isOpen={showPhoneLogin}
         onClose={() => setShowPhoneLogin(false)}
       />
-
       <ToastContainer toasts={toasts} removeToast={removeToast} />
     </>
   );

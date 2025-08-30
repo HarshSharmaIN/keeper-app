@@ -1,26 +1,26 @@
-import { Routes, Route } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
-import { useLocation } from 'react-router-dom'
-import Home from './pages/Home'
-import Login from './pages/Login'
-import Signup from './pages/Signup'
-import Header from './components/Header'
-import Footer from './components/Footer'
+import { Routes, Route } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import { useLocation } from "react-router-dom";
+import Home from "./pages/Home";
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
+import Header from "./components/Header";
+import Footer from "./components/Footer";
 
 function App() {
-  const location = useLocation()
+  const location = useLocation();
 
   const pageVariants = {
     initial: { opacity: 0, y: 20 },
     in: { opacity: 1, y: 0 },
-    out: { opacity: 0, y: -20 }
-  }
+    out: { opacity: 0, y: -20 },
+  };
 
   const pageTransition = {
-    type: 'tween',
-    ease: 'anticipate',
-    duration: 0.5
-  }
+    type: "tween",
+    ease: "anticipate",
+    duration: 0.5,
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -28,8 +28,8 @@ function App() {
       <main className="flex-1">
         <AnimatePresence mode="wait">
           <Routes location={location} key={location.pathname}>
-            <Route 
-              path="/" 
+            <Route
+              path="/"
               element={
                 <motion.div
                   initial="initial"
@@ -40,10 +40,10 @@ function App() {
                 >
                   <Home />
                 </motion.div>
-              } 
+              }
             />
-            <Route 
-              path="/login" 
+            <Route
+              path="/login"
               element={
                 <motion.div
                   initial="initial"
@@ -54,10 +54,10 @@ function App() {
                 >
                   <Login />
                 </motion.div>
-              } 
+              }
             />
-            <Route 
-              path="/signup" 
+            <Route
+              path="/signup"
               element={
                 <motion.div
                   initial="initial"
@@ -68,14 +68,15 @@ function App() {
                 >
                   <Signup />
                 </motion.div>
-              } 
+              }
             />
           </Routes>
         </AnimatePresence>
       </main>
+      <div id="recaptcha-container"></div>
       <Footer />
     </div>
-  )
+  );
 }
 
-export default App
+export default App;
